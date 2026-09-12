@@ -44,8 +44,12 @@ This project provides an end-to-end solution:
    - Unique index on `idempotency_key`.
    - PL/pgSQL database trigger (`fn_audit_trade_status_change`) writing state transitions into an append-only `trade_audit_logs` table with `JSONB` payloads.
    - Composite indexing for fast back-office query filtering.
-6. **TradeOps Terminal (`webapp/`):**
-   - Full React (Vite) single-page app simulating a trading desk: mock login, live dashboard, trade blotter with filters, an order ticket, and a trade detail view with audit trail + manual broker reconciliation.
+   - User authentication schema (`users` table) with case-insensitive unique username index.
+6. **Authentication & User Directory (`TradeOps.Core/Services/IUserService` & `AuthController`):**
+   - Secure PBKDF2 (SHA-256 with 100,000 iterations & random 16-byte salt) password hashing via standard .NET cryptography.
+   - Real database registration (`POST /api/auth/register`) and login (`POST /api/auth/login`) persisted in PostgreSQL or in-memory fallback.
+7. **TradeOps Terminal (`webapp/`):**
+   - Full React (Vite) single-page app simulating a trading desk: sign in / register account tabs, live dashboard, trade blotter with filters, an order ticket, and a trade detail view with audit trail + manual broker reconciliation.
 
 ---
 
@@ -170,7 +174,7 @@ The legacy single-file prototype (`index.html`, CDN React + Babel) is still avai
 
 ## 6. API Reference
 
-Base path: `http://localhost:5025/api/trades`
+### Trades API (`http://localhost:5025/api/trades`)
 
 | Method | Route              | Description                                                                                        | Body                    |
 | ------ | ------------------ | -------------------------------------------------------------------------------------------------- | ----------------------- |
@@ -180,7 +184,17 @@ Base path: `http://localhost:5025/api/trades`
 | `GET`  | `/{id}/audit-logs` | Get the append-only audit trail for a trade.                                                       | —                       |
 | `POST` | `/{id}/reconcile`  | Submit a broker execution report; transitions the trade to `Reconciled` or `Discrepancy`.          | `BrokerExecutionReport` |
 
-`IngestTradeRequest`: `{ idempotencyKey, accountId, symbol, side (0=Buy,1=Sell), quantity, price }`
+### Authentication API (`http://localhost:5025/api/auth`)
+
+| Method | Route        | Description                                                    | Body              |
+| ------ | ------------ | -------------------------------------------------------------- | ----------------- |
+| `POST` | `/register`  | Register a new user account in PostgreSQL.                     | `RegisterRequest` |
+| `POST` | `/login`     | Verify credentials against PBKDF2 password hash in PostgreSQL. | `LoginRequest`    |
+| `GET`  | `/me/{user}` | Get user profile by username.                                  | —                 |
+
+`RegisterRequest`: `{ username, password, displayName, role, accountId }`  
+`LoginRequest`: `{ username, password }`  
+`IngestTradeRequest`: `{ idempotencyKey, accountId, symbol, side (0=Buy,1=Sell), quantity, price }`  
 `BrokerExecutionReport`: `{ externalTradeId, symbol, side, quantity, executedPrice, executionTimeUtc }`
 
 ---

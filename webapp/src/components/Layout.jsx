@@ -36,9 +36,9 @@ export default function Layout() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <span className="brand-mark">BM</span>
+          <span className="brand-mark">TOM</span>
           <div>
-            <div className="brand-name">Blueberry Markets</div>
+            <div className="brand-name">TradeOps Markets</div>
             <div className="brand-sub">TradeOps Terminal</div>
           </div>
         </div>

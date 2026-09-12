@@ -12,6 +12,7 @@ public class TradeOpsDbContext : DbContext
 
     public DbSet<TradeEntity> Trades => Set<TradeEntity>();
     public DbSet<TradeAuditLogEntity> AuditLogs => Set<TradeAuditLogEntity>();
+    public DbSet<UserEntity> Users => Set<UserEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -51,6 +52,22 @@ public class TradeOpsDbContext : DbContext
             entity.Property(a => a.CreatedAtUtc).HasColumnName("created_at_utc").HasDefaultValueSql("clock_timestamp()");
 
             entity.HasIndex(a => new { a.TradeId, a.CreatedAtUtc });
+        });
+
+        modelBuilder.Entity<UserEntity>(entity =>
+        {
+            entity.ToTable("users");
+            entity.HasKey(u => u.UserId);
+
+            entity.Property(u => u.UserId).HasColumnName("user_id").HasDefaultValueSql("gen_random_uuid()");
+            entity.Property(u => u.Username).HasColumnName("username");
+            entity.Property(u => u.PasswordHash).HasColumnName("password_hash");
+            entity.Property(u => u.DisplayName).HasColumnName("display_name");
+            entity.Property(u => u.Role).HasColumnName("role");
+            entity.Property(u => u.AccountId).HasColumnName("account_id");
+            entity.Property(u => u.CreatedAtUtc).HasColumnName("created_at_utc").HasDefaultValueSql("clock_timestamp()");
+
+            entity.HasIndex(u => u.Username).IsUnique();
         });
     }
 }

@@ -32,10 +32,12 @@ if (!string.IsNullOrEmpty(pgConnectionString))
 
     // Scoped: EF Core's DbContext is not thread-safe and must not be shared across concurrent requests.
     builder.Services.AddScoped<ITradeRepository, PostgresTradeRepository>();
+    builder.Services.AddScoped<IUserService, PostgresUserService>();
 }
 else
 {
     builder.Services.AddSingleton<ITradeRepository, InMemoryTradeRepository>();
+    builder.Services.AddSingleton<IUserService, InMemoryUserService>();
 }
 
 builder.Services.AddSingleton<ITradeProcessingQueue, ChannelTradeProcessingQueue>();

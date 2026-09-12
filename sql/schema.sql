@@ -73,3 +73,16 @@ CREATE TRIGGER trg_trades_audit_status_change
     BEFORE UPDATE ON trades
     FOR EACH ROW
     EXECUTE FUNCTION fn_audit_trade_status_change();
+
+-- 5. User Directory Table
+CREATE TABLE IF NOT EXISTS users (
+    user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username VARCHAR(64) NOT NULL,
+    password_hash VARCHAR(256) NOT NULL,
+    display_name VARCHAR(128) NOT NULL,
+    role VARCHAR(32) NOT NULL DEFAULT 'Trader',
+    account_id VARCHAR(64) NOT NULL,
+    created_at_utc TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_users_username ON users (LOWER(username));

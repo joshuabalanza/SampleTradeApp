@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { authApi } from '../api/authApi.js';
 
 const SESSION_KEY = 'tradeops.session';
 
-// Mock credential store for the demo — no real backend authentication exists.
+// Pre-seeded demo credentials for quick-fill testing
 export const DEMO_USERS = [
   {
     username: 'trader1',
@@ -38,16 +39,47 @@ export function AuthProvider({ children }) {
 
   const value = useMemo(() => ({
     user,
-    login(username, password) {
-      const match = DEMO_USERS.find(
-        (u) => u.username === username.trim().toLowerCase() && u.password === password
-      );
-      if (!match) {
-        throw new Error('Invalid username or password.');
+    async login(username, password) {
+      try {
+        const response = await authApi.login(username, password);
+        setUser(response.user);
+        return response.user;
+      } catch (err) {
+        // Fallback to demo users if network/offline
+        if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+          const match = DEMO_USERS.find(
+            (u) => u.username === username.trim().toLowerCase() && u.password === password
+          );
+          if (match) {
+            const { password: _password, ...publicUser } = match;
+            setUser(publicUser);
+            return publicUser;
+          }
+        }
+        throw err;
       }
-      const { password: _password, ...publicUser } = match;
-      setUser(publicUser);
-      return publicUser;
+    },
+    async register(payload) {
+      try {
+        const response = await authApi.register(payload);
+        setUser(response.user);
+        return response.user;
+      } catch (err) {
+        // Fallback to local session if network/offline
+        if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+          const newUser = {
+            userId: crypto.randomUUID(),
+            username: payload.username,
+            displayName: payload.displayName || payload.username,
+            role: payload.role || 'Trader',
+            accountId: payload.accountId || `ACC-${payload.username.toUpperCase()}`,
+            createdAtUtc: new Date().toISOString(),
+          };
+          setUser(newUser);
+          return newUser;
+        }
+        throw err;
+      }
     },
     logout() {
       setUser(null);
