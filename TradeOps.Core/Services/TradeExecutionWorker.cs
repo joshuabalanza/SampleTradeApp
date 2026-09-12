@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using TradeOps.Core.Models;
@@ -7,16 +8,16 @@ namespace TradeOps.Core.Services;
 public class TradeExecutionWorker : BackgroundService
 {
     private readonly ITradeProcessingQueue _queue;
-    private readonly ITradeRepository _repository;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<TradeExecutionWorker> _logger;
 
     public TradeExecutionWorker(
         ITradeProcessingQueue queue,
-        ITradeRepository repository,
+        IServiceScopeFactory scopeFactory,
         ILogger<TradeExecutionWorker> logger)
     {
         _queue = queue;
-        _repository = repository;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
@@ -27,9 +28,13 @@ public class TradeExecutionWorker : BackgroundService
         // Asynchronously read from channel as items become available
         await foreach (var tradeId in _queue.ReadAllAsync(stoppingToken))
         {
+            // ITradeRepository may be scoped (EF Core DbContext), so resolve it in its own scope per item.
+            using var scope = _scopeFactory.CreateScope();
+            var repository = scope.ServiceProvider.GetRequiredService<ITradeRepository>();
+
             try
             {
-                var trade = await _repository.GetByIdAsync(tradeId);
+                var trade = await repository.GetByIdAsync(tradeId);
                 if (trade == null || trade.Status != TradeStatus.Pending)
                 {
                     continue;
@@ -39,7 +44,7 @@ public class TradeExecutionWorker : BackgroundService
                 await Task.Delay(15, stoppingToken);
 
                 // Update trade state to Executed
-                await _repository.UpdateStatusAsync(tradeId, TradeStatus.Executed);
+                await repository.UpdateStatusAsync(tradeId, TradeStatus.Executed);
 
                 _logger.LogInformation("Trade {TradeId} successfully EXECUTED.", tradeId);
             }
@@ -50,7 +55,7 @@ public class TradeExecutionWorker : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed executing trade {TradeId}", tradeId);
-                await _repository.UpdateStatusAsync(tradeId, TradeStatus.Failed, ex.Message);
+                await repository.UpdateStatusAsync(tradeId, TradeStatus.Failed, ex.Message);
             }
         }
 

@@ -1,3 +1,8 @@
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using Npgsql.NameTranslation;
+using TradeOps.Core.Data;
+using TradeOps.Core.Models;
 using TradeOps.Core.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,10 +14,24 @@ builder.Services.AddOpenApi();
 // Get PostgreSQL connection string
 var pgConnectionString = builder.Configuration.GetConnectionString("Postgres");
 
-// Register PostgreSQL repository if configured, otherwise fall back to InMemory
+// Register EF Core + PostgreSQL repository if configured, otherwise fall back to InMemory
 if (!string.IsNullOrEmpty(pgConnectionString))
 {
-    builder.Services.AddSingleton<ITradeRepository>(new PostgresTradeRepository(pgConnectionString));
+    var nameTranslator = new NpgsqlNullNameTranslator();
+    var dataSourceBuilder = new NpgsqlDataSourceBuilder(pgConnectionString);
+    dataSourceBuilder.MapEnum<OrderSide>("order_side", nameTranslator: nameTranslator);
+    dataSourceBuilder.MapEnum<TradeStatus>("trade_status", nameTranslator: nameTranslator);
+    var dataSource = dataSourceBuilder.Build();
+
+    builder.Services.AddSingleton(dataSource);
+    builder.Services.AddDbContext<TradeOpsDbContext>(options => options.UseNpgsql(dataSource, npgsqlOptions =>
+    {
+        npgsqlOptions.MapEnum<OrderSide>("order_side", nameTranslator: nameTranslator);
+        npgsqlOptions.MapEnum<TradeStatus>("trade_status", nameTranslator: nameTranslator);
+    }));
+
+    // Scoped: EF Core's DbContext is not thread-safe and must not be shared across concurrent requests.
+    builder.Services.AddScoped<ITradeRepository, PostgresTradeRepository>();
 }
 else
 {
