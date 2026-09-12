@@ -64,6 +64,7 @@ flowchart LR
 
     subgraph API["TradeOps.Api (ASP.NET Core)"]
         Ctrl["TradesController"]
+        AuthCtrl["AuthController"]
     end
 
     subgraph Core["TradeOps.Core"]
@@ -71,12 +72,16 @@ flowchart LR
         Worker["TradeExecutionWorker<br/>(BackgroundService)"]
         Reconcile["ReconciliationService<br/>(0.5% slippage tolerance)"]
         Repo["ITradeRepository<br/>(EF Core or InMemory)"]
+        UserSvc["IUserService<br/>(EF Core or InMemory + PBKDF2)"]
     end
 
-    DB[("PostgreSQL<br/>trades / trade_audit_logs<br/>+ audit trigger")]
+    DB[("PostgreSQL<br/>trades / trade_audit_logs / users<br/>+ audit trigger")]
 
     UI -- "REST + JSON" --> Ctrl
+    UI -- "Auth API" --> AuthCtrl
     Legacy -- "REST + JSON" --> Ctrl
+    AuthCtrl -- "login / register" --> UserSvc
+    UserSvc --> DB
     Ctrl -- "ingest (idempotent)" --> Repo
     Ctrl -- "enqueue TradeId" --> Queue
     Queue --> Worker
@@ -94,21 +99,21 @@ flowchart LR
 
 ```
 capstone/
-├── TradeOps.Api/            # ASP.NET Core Web API (Program.cs, Controllers, DI wiring)
+├── TradeOps.Api/            # ASP.NET Core Web API (Program.cs, TradesController, AuthController, DI wiring)
 ├── TradeOps.Core/           # Domain models, services, EF Core data layer
-│   ├── Models/              # Trade, IngestTradeRequest, AuditLog, BrokerExecutionReport (records)
-│   ├── Services/             # ITradeRepository (Postgres/EF + InMemory), queue, worker, reconciliation
-│   └── Data/                 # TradeOpsDbContext, TradeEntity, TradeAuditLogEntity
-├── TradeOps.Tests/          # xUnit tests (idempotency, slippage, reconciliation)
+│   ├── Models/              # Trade, IngestTradeRequest, AuditLog, BrokerExecutionReport, UserModels (records)
+│   ├── Services/             # ITradeRepository, IUserService, PasswordHasher, queue, worker, reconciliation
+│   └── Data/                 # TradeOpsDbContext, TradeEntity, TradeAuditLogEntity, UserEntity
+├── TradeOps.Tests/          # xUnit tests (TradeEngineTests, UserAuthTests)
 ├── sql/
-│   ├── schema.sql            # Postgres schema, enums, indexes, audit trigger
+│   ├── schema.sql            # Postgres schema (trades, trade_audit_logs, users, enums, indexes, audit trigger)
 │   └── run_demo.py           # Standalone SQLite simulation of the schema/trigger logic
 ├── webapp/                  # React (Vite) TradeOps Terminal — full trading UI
 │   └── src/
-│       ├── api/               # tradesApi.js — fetch client for TradeOps.Api
-│       ├── auth/               # Mock AuthContext (demo credentials, session storage)
+│       ├── api/               # tradesApi.js, authApi.js — fetch clients for TradeOps.Api
+│       ├── auth/               # AuthContext.jsx (session state, auth API integration with offline fallback)
 │       ├── components/        # Layout, ProtectedRoute, StatusBadge, MarketTicker
-│       └── pages/              # Login, Dashboard, Blotter, New Order, Trade Detail
+│       └── pages/              # Login/Register, Dashboard, Blotter, New Order, Trade Detail
 ├── docker-compose.yml        # PostgreSQL container, auto-applies sql/schema.sql on first boot
 ├── index.html                 # Legacy single-file React (CDN) demo of the same API
 └── TradeOps.sln
@@ -137,11 +142,17 @@ Open VS Code terminal (`Cmd + ` `) and run:
 dotnet test
 ```
 
-**Test Coverage:**
+**Test Coverage (`TradeOps.Tests`):**
 
-- Idempotency replay verification (prevents duplicate trades).
-- Slippage discrepancy detection (> 0.5% drift).
-- Healthy trade reconciliation matching broker reports.
+- **Trade Engine (`TradeEngineTests.cs`)**:
+  - Idempotency replay verification (prevents duplicate trades).
+  - Slippage discrepancy detection (> 0.5% drift).
+  - Healthy trade reconciliation matching broker reports.
+- **Authentication (`UserAuthTests.cs`)**:
+  - User registration with PBKDF2 password hashing.
+  - Duplicate username rejection (`InvalidOperationException`).
+  - Valid credential authentication returning user profiles.
+  - Incorrect password rejection (`UnauthorizedAccessException`).
 
 ### Running the API
 
@@ -222,15 +233,21 @@ The legacy single-file prototype (`index.html`, CDN React + Babel) is still avai
 
 ## 9. Testing
 
-`TradeOps.Tests` (xUnit) covers the core business rules against `InMemoryTradeRepository`:
+`TradeOps.Tests` (xUnit) covers core business and security rules against in-memory providers (`InMemoryTradeRepository` and `InMemoryUserService`):
 
 ```bash
 dotnet test
 ```
 
-- Idempotency replay verification (prevents duplicate trades).
-- Slippage discrepancy detection (> 0.5% drift).
-- Healthy trade reconciliation matching broker reports.
+- **`TradeEngineTests.cs`**:
+  - Idempotency replay verification (prevents duplicate trades).
+  - Slippage discrepancy detection (> 0.5% drift).
+  - Healthy trade reconciliation matching broker reports.
+- **`UserAuthTests.cs`**:
+  - Registration with PBKDF2 password hashing.
+  - Duplicate username rejection.
+  - Valid credential login.
+  - Invalid password rejection.
 
 `sql/run_demo.py` is a standalone SQLite script that simulates the same schema/trigger behavior outside of .NET, useful for verifying the audit-trigger logic in isolation.
 
