@@ -3,6 +3,23 @@
 **By:** Joshua Kim C. Balanza  
 **Stack:** .NET 9 (C#), EF Core, PostgreSQL, React (Vite), System.Threading.Channels, xUnit
 
+A back-office trade ingestion, execution, and reconciliation platform for an FX/CFD desk — built to demonstrate **idempotent APIs, asynchronous processing, database-level auditability, and a full trading UI**, from login to reconciled trade.
+
+---
+
+## Table of Contents
+
+1. [Project Overview & Architectural Highlights](#1-project-overview--architectural-highlights)
+2. [Architecture Diagram](#2-architecture-diagram)
+3. [Repository Layout](#3-repository-layout)
+4. [Prerequisites](#4-prerequisites)
+5. [Quickstart Instructions on macOS (VS Code)](#5-quickstart-instructions-on-macos-vs-code)
+6. [API Reference](#6-api-reference)
+7. [Domain Model & Trade Lifecycle](#7-domain-model--trade-lifecycle)
+8. [Configuration & Environment Variables](#8-configuration--environment-variables)
+9. [Testing](#9-testing)
+10. [Design Notes & Trade-offs](#10-design-notes--trade-offs)
+
 ---
 
 ## 1. Project Overview & Architectural Highlights
@@ -32,7 +49,81 @@ This project provides an end-to-end solution:
 
 ---
 
-## 2. Quickstart Instructions on macOS (VS Code)
+## 2. Architecture Diagram
+
+```mermaid
+flowchart LR
+    subgraph Client
+        UI["TradeOps Terminal<br/>(React + Vite, webapp/)"]
+        Legacy["Legacy single-file demo<br/>(index.html)"]
+    end
+
+    subgraph API["TradeOps.Api (ASP.NET Core)"]
+        Ctrl["TradesController"]
+    end
+
+    subgraph Core["TradeOps.Core"]
+        Queue["ChannelTradeProcessingQueue<br/>(bounded, backpressure)"]
+        Worker["TradeExecutionWorker<br/>(BackgroundService)"]
+        Reconcile["ReconciliationService<br/>(0.5% slippage tolerance)"]
+        Repo["ITradeRepository<br/>(EF Core or InMemory)"]
+    end
+
+    DB[("PostgreSQL<br/>trades / trade_audit_logs<br/>+ audit trigger")]
+
+    UI -- "REST + JSON" --> Ctrl
+    Legacy -- "REST + JSON" --> Ctrl
+    Ctrl -- "ingest (idempotent)" --> Repo
+    Ctrl -- "enqueue TradeId" --> Queue
+    Queue --> Worker
+    Worker --> Repo
+    Ctrl -- "reconcile" --> Reconcile
+    Reconcile --> Repo
+    Repo --> DB
+```
+
+**Trade lifecycle:** `Pending` → (`TradeExecutionWorker`) → `Executed` → (broker report via `/reconcile`) → `Reconciled` or `Discrepancy`.
+
+---
+
+## 3. Repository Layout
+
+```
+capstone/
+├── TradeOps.Api/            # ASP.NET Core Web API (Program.cs, Controllers, DI wiring)
+├── TradeOps.Core/           # Domain models, services, EF Core data layer
+│   ├── Models/              # Trade, IngestTradeRequest, AuditLog, BrokerExecutionReport (records)
+│   ├── Services/             # ITradeRepository (Postgres/EF + InMemory), queue, worker, reconciliation
+│   └── Data/                 # TradeOpsDbContext, TradeEntity, TradeAuditLogEntity
+├── TradeOps.Tests/          # xUnit tests (idempotency, slippage, reconciliation)
+├── sql/
+│   ├── schema.sql            # Postgres schema, enums, indexes, audit trigger
+│   └── run_demo.py           # Standalone SQLite simulation of the schema/trigger logic
+├── webapp/                  # React (Vite) TradeOps Terminal — full trading UI
+│   └── src/
+│       ├── api/               # tradesApi.js — fetch client for TradeOps.Api
+│       ├── auth/               # Mock AuthContext (demo credentials, session storage)
+│       ├── components/        # Layout, ProtectedRoute, StatusBadge, MarketTicker
+│       └── pages/              # Login, Dashboard, Blotter, New Order, Trade Detail
+├── docker-compose.yml        # PostgreSQL container, auto-applies sql/schema.sql on first boot
+├── index.html                 # Legacy single-file React (CDN) demo of the same API
+└── TradeOps.sln
+```
+
+---
+
+## 4. Prerequisites
+
+| Tool           | Version    | Notes                                                             |
+| -------------- | ---------- | ----------------------------------------------------------------- |
+| .NET SDK       | 9.0+       | `dotnet --version`                                                |
+| Docker Desktop | any recent | for the PostgreSQL container                                      |
+| Node.js        | 18+        | for the `webapp/` front-end (via `nvm`, `fnm`, or system install) |
+| npm            | 9+         | ships with Node                                                   |
+
+---
+
+## 5. Quickstart Instructions on macOS (VS Code)
 
 ### Running Automated Unit Tests
 
@@ -55,7 +146,7 @@ docker compose up -d postgres   # starts PostgreSQL with sql/schema.sql applied
 dotnet run --project TradeOps.Api/TradeOps.Api.csproj
 ```
 
-By default the API listens on `http://localhost:5025` (see `TradeOps.Api/Properties/launchSettings.json`).
+By default the API listens on `http://localhost:5025` (see `TradeOps.Api/Properties/launchSettings.json`). Without a running Postgres/connection string, the API automatically falls back to an in-memory repository — useful for quick demos or CI.
 
 ### Running the TradeOps Terminal (React front-end)
 
@@ -74,3 +165,67 @@ The app calls the API at the URL configured in `webapp/.env` (`VITE_API_BASE_URL
 **Flow covered end-to-end:** Login → Dashboard (live stats & market ticker) → New Order ticket (idempotent submission) → automatic background execution → Trade Detail (audit trail) → manual broker reconciliation.
 
 The legacy single-file prototype (`index.html`, CDN React + Babel) is still available for a quick, dependency-free demo of the same API.
+
+---
+
+## 6. API Reference
+
+Base path: `http://localhost:5025/api/trades`
+
+| Method | Route              | Description                                                                                        | Body                    |
+| ------ | ------------------ | -------------------------------------------------------------------------------------------------- | ----------------------- |
+| `POST` | `/`                | Ingest a new trade (idempotent on `idempotencyKey`). Returns `201` on new trades, `200` on replay. | `IngestTradeRequest`    |
+| `GET`  | `/`                | List the 100 most recent trades.                                                                   | —                       |
+| `GET`  | `/{id}`            | Get a single trade by `tradeId`.                                                                   | —                       |
+| `GET`  | `/{id}/audit-logs` | Get the append-only audit trail for a trade.                                                       | —                       |
+| `POST` | `/{id}/reconcile`  | Submit a broker execution report; transitions the trade to `Reconciled` or `Discrepancy`.          | `BrokerExecutionReport` |
+
+`IngestTradeRequest`: `{ idempotencyKey, accountId, symbol, side (0=Buy,1=Sell), quantity, price }`
+`BrokerExecutionReport`: `{ externalTradeId, symbol, side, quantity, executedPrice, executionTimeUtc }`
+
+---
+
+## 7. Domain Model & Trade Lifecycle
+
+`TradeStatus`: `Pending (0)` → `Executed (1)` → `Reconciled (2)` | `Discrepancy (3)` | `Failed (4)`
+
+1. **Ingest** — `POST /api/trades` validates the request, checks `idempotency_key` for a replay, and inserts a new `Pending` trade.
+2. **Enqueue** — the new trade ID is pushed onto a bounded `System.Threading.Channels` queue.
+3. **Execute** — `TradeExecutionWorker` (background service) dequeues, simulates broker routing latency, and transitions the trade to `Executed`.
+4. **Reconcile** — `POST /api/trades/{id}/reconcile` compares the broker's execution report against the trade (symbol, side, quantity, and price within a 0.5% slippage tolerance) and marks it `Reconciled` or `Discrepancy` with a reason.
+5. **Audit** — every status transition is recorded by a PostgreSQL trigger into `trade_audit_logs`, independent of the application layer.
+
+---
+
+## 8. Configuration & Environment Variables
+
+| Location                                 | Key                          | Purpose                                                                                   |
+| ---------------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------- |
+| `TradeOps.Api/appsettings.json`          | `ConnectionStrings:Postgres` | Postgres connection string. If empty/missing, the API uses `InMemoryTradeRepository`.     |
+| `webapp/.env` (copy from `.env.example`) | `VITE_API_BASE_URL`          | Base URL the React app uses to call `TradeOps.Api` (default `http://localhost:5025/api`). |
+
+---
+
+## 9. Testing
+
+`TradeOps.Tests` (xUnit) covers the core business rules against `InMemoryTradeRepository`:
+
+```bash
+dotnet test
+```
+
+- Idempotency replay verification (prevents duplicate trades).
+- Slippage discrepancy detection (> 0.5% drift).
+- Healthy trade reconciliation matching broker reports.
+
+`sql/run_demo.py` is a standalone SQLite script that simulates the same schema/trigger behavior outside of .NET, useful for verifying the audit-trigger logic in isolation.
+
+---
+
+## 10. Design Notes & Trade-offs
+
+- **Idempotency** is enforced both in the API layer (check-then-insert) and at the database layer (`UNIQUE INDEX` on `idempotency_key`); a concurrent race is resolved by catching the Postgres unique-violation and returning the winning row.
+- **EF Core + native Postgres enums**: `order_side`/`trade_status` are mapped via `NpgsqlDataSourceBuilder.MapEnum` _and_ `npgsqlOptions.MapEnum` (both are required — see inline comments in `Program.cs`) so C# enums round-trip as native Postgres enum types instead of integers.
+- **`ITradeRepository` lifetime** differs by backend: `Scoped` when backed by EF Core's `DbContext` (Postgres), `Singleton` for the in-memory fallback. `TradeExecutionWorker` (a singleton `BackgroundService`) resolves the repository via `IServiceScopeFactory` per queue item to stay compatible with either lifetime.
+- **Auditability lives in the database**, not just the app: the `fn_audit_trade_status_change` trigger guarantees every status change is logged even if it originates from a direct SQL update.
+- **The front-end has no real backend authentication** — login is a mock/demo layer (`webapp/src/auth/AuthContext.jsx`) intended to showcase the full user journey; do not reuse it as-is for production auth.
