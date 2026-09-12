@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "dgSpecHash": "Hy0MBdk9bwg=",
+  "success": true,
+  "projectFilePath": "/Users/joshuakimbalanza/.copilot/session-state/7570090c-2a25-4af8-9f56-2aee2a4a26ab/files/capstone/TradeOps.Core/TradeOps.Core.csproj",
+  "expectedPackageFiles": [
+    "/Users/joshuakimbalanza/.nuget/packages/microsoft.extensions.configuration.abstractions/10.0.12/microsoft.extensions.configuration.abstractions.10.0.12.nupkg.sha512",
+    "/Users/joshuakimbalanza/.nuget/packages/microsoft.extensions.dependencyinjection.abstractions/10.0.12/microsoft.extensions.dependencyinjection.abstractions.10.0.12.nupkg.sha512",
+    "/Users/joshuakimbalanza/.nuget/packages/microsoft.extensions.diagnostics.abstractions/10.0.12/microsoft.extensions.diagnostics.abstractions.10.0.12.nupkg.sha512",
+    "/Users/joshuakimbalanza/.nuget/packages/microsoft.extensions.fileproviders.abstractions/10.0.12/microsoft.extensions.fileproviders.abstractions.10.0.12.nupkg.sha512",
+    "/Users/joshuakimbalanza/.nuget/packages/microsoft.extensions.hosting.abstractions/10.0.12/microsoft.extensions.hosting.abstractions.10.0.12.nupkg.sha512",
+    "/Users/joshuakimbalanza/.nuget/packages/microsoft.extensions.logging.abstractions/10.0.12/microsoft.extensions.logging.abstractions.10.0.12.nupkg.sha512",
+    "/Users/joshuakimbalanza/.nuget/packages/microsoft.extensions.options/10.0.12/microsoft.extensions.options.10.0.12.nupkg.sha512",
+    "/Users/joshuakimbalanza/.nuget/packages/microsoft.extensions.primitives/10.0.12/microsoft.extensions.primitives.10.0.12.nupkg.sha512",
+    "/Users/joshuakimbalanza/.nuget/packages/npgsql/10.0.3/npgsql.10.0.3.nupkg.sha512",
+    "/Users/joshuakimbalanza/.nuget/packages/system.diagnostics.diagnosticsource/10.0.12/system.diagnostics.diagnosticsource.10.0.12.nupkg.sha512"
+  ],
+  "logs": []
+}

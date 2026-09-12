@@ -1,0 +1,12 @@
+/Users/joshuakimbalanza/.copilot/session-state/7570090c-2a25-4af8-9f56-2aee2a4a26ab/files/capstone/TradeOps.Core/bin/Debug/net9.0/TradeOps.Core.deps.json
+/Users/joshuakimbalanza/.copilot/session-state/7570090c-2a25-4af8-9f56-2aee2a4a26ab/files/capstone/TradeOps.Core/bin/Debug/net9.0/TradeOps.Core.dll
+/Users/joshuakimbalanza/.copilot/session-state/7570090c-2a25-4af8-9f56-2aee2a4a26ab/files/capstone/TradeOps.Core/bin/Debug/net9.0/TradeOps.Core.pdb
+/Users/joshuakimbalanza/.copilot/session-state/7570090c-2a25-4af8-9f56-2aee2a4a26ab/files/capstone/TradeOps.Core/obj/Debug/net9.0/TradeOps.Core.csproj.AssemblyReference.cache
+/Users/joshuakimbalanza/.copilot/session-state/7570090c-2a25-4af8-9f56-2aee2a4a26ab/files/capstone/TradeOps.Core/obj/Debug/net9.0/TradeOps.Core.GeneratedMSBuildEditorConfig.editorconfig
+/Users/joshuakimbalanza/.copilot/session-state/7570090c-2a25-4af8-9f56-2aee2a4a26ab/files/capstone/TradeOps.Core/obj/Debug/net9.0/TradeOps.Core.AssemblyInfoInputs.cache
+/Users/joshuakimbalanza/.copilot/session-state/7570090c-2a25-4af8-9f56-2aee2a4a26ab/files/capstone/TradeOps.Core/obj/Debug/net9.0/TradeOps.Core.AssemblyInfo.cs
+/Users/joshuakimbalanza/.copilot/session-state/7570090c-2a25-4af8-9f56-2aee2a4a26ab/files/capstone/TradeOps.Core/obj/Debug/net9.0/TradeOps.Core.csproj.CoreCompileInputs.cache
+/Users/joshuakimbalanza/.copilot/session-state/7570090c-2a25-4af8-9f56-2aee2a4a26ab/files/capstone/TradeOps.Core/obj/Debug/net9.0/TradeOps.Core.dll
+/Users/joshuakimbalanza/.copilot/session-state/7570090c-2a25-4af8-9f56-2aee2a4a26ab/files/capstone/TradeOps.Core/obj/Debug/net9.0/refint/TradeOps.Core.dll
+/Users/joshuakimbalanza/.copilot/session-state/7570090c-2a25-4af8-9f56-2aee2a4a26ab/files/capstone/TradeOps.Core/obj/Debug/net9.0/TradeOps.Core.pdb
+/Users/joshuakimbalanza/.copilot/session-state/7570090c-2a25-4af8-9f56-2aee2a4a26ab/files/capstone/TradeOps.Core/obj/Debug/net9.0/ref/TradeOps.Core.dll

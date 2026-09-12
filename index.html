@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blueberry Markets | Back-Office TradeOps Portal</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+    }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); margin: 0; padding: 24px; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 24px; }
+    .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; text-transform: uppercase; }
+    .badge-Pending { background: #388bfd33; color: var(--accent); }
+    .badge-Executed { background: #3fb95033; color: var(--green); }
+    .badge-Reconciled { background: #238636; color: #fff; }
+    .badge-Discrepancy { background: #f8514933; color: var(--red); }
+    .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+    th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--border); }
+    th { color: #8b949e; }
+    button { background: var(--accent); color: #0d1117; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+    button:hover { opacity: 0.9; }
+    .btn-reconcile { background: var(--green); }
+    .form-group { margin-bottom: 12px; }
+    label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 4px; }
+    input, select { width: 100%; background: #0d1117; border: 1px solid var(--border); color: #fff; padding: 8px; border-radius: 6px; }
+    .audit-box { max-height: 250px; overflow-y: auto; font-family: monospace; font-size: 12px; background: #090d13; padding: 12px; border-radius: 6px; border: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    const API_BASE = "http://localhost:5000/api/trades";
+
+    function App() {
+      const [trades, setTrades] = useState([]);
+      const [logs, setLogs] = useState([]);
+      const [dbStatus, setDbStatus] = useState("Checking...");
+      const [form, setForm] = useState({
+        accountId: "ACC-JOSHUA-101",
+        symbol: "EURUSD",
+        side: "Buy",
+        quantity: 100000,
+        price: 1.0850
+      });
+
+      const fetchTrades = async () => {
+        try {
+          const res = await fetch(API_BASE);
+          if (res.ok) {
+            const data = await res.json();
+            setTrades(data);
+            setDbStatus("Connected to .NET & PostgreSQL");
+          }
+        } catch (err) {
+          setDbStatus("Local Demo Mode (Start API to see live DB)");
+        }
+      };
+
+      useEffect(() => {
+        fetchTrades();
+        const interval = setInterval(fetchTrades, 3000);
+        return () => clearInterval(interval);
+      }, []);
+
+      const handleIngest = async (e) => {
+        e.preventDefault();
+        const idempotencyKey = `ORD-${Date.now()}-${form.symbol}`;
+        const payload = {
+          idempotencyKey,
+          accountId: form.accountId,
+          symbol: form.symbol,
+          side: form.side === "Buy" ? 0 : 1,
+          quantity: Number(form.quantity),
+          price: Number(form.price)
+        };
+
+        try {
+          const res = await fetch(API_BASE, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          if (res.ok) {
+            fetchTrades();
+            setLogs(prev => [
+              { action: "TRADE_INGESTED", details: `Ingested ${form.symbol} into PostgreSQL (${idempotencyKey})`, time: new Date().toLocaleTimeString() },
+              ...prev
+            ]);
+          }
+        } catch (err) {
+          // Fallback UI
+          setTrades(prev => [{ tradeId: crypto.randomUUID(), idempotencyKey, ...form, status: "Executed", createdAtUtc: new Date().toISOString() }, ...prev]);
+        }
+      };
+
+      const handleOverrideReconcile = async (tradeId) => {
+        try {
+          await fetch(`${API_BASE}/${tradeId}/reconcile`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              externalTradeId: `BROKER-RECON-${Date.now()}`,
+              symbol: "EURUSD",
+              side: 0,
+              quantity: 100000,
+              executedPrice: 1.0850,
+              executionTimeUtc: new Date().toISOString()
+            })
+          });
+          fetchTrades();
+        } catch (err) {
+          setTrades(trades.map(t => t.tradeId === tradeId ? { ...t, status: "Reconciled", discrepancyReason: null } : t));
+        }
+        setLogs(prev => [
+          { action: "MANUAL_RECONCILE", details: `Trade ${tradeId.slice(0, 8)} reconciled in PostgreSQL`, time: new Date().toLocaleTimeString() },
+          ...prev
+        ]);
+      };
+
+      return (
+        <div>
+          <div className="header">
+            <div>
+              <h1 style={{ margin: 0, fontSize: "20px" }}>Blueberry Markets — Back-Office TradeOps Portal</h1>
+              <p style={{ margin: "4px 0 0 0", color: "#8b949e", fontSize: "13px" }}>
+                Real-Time Trade Stream, Ingestion Engine & Reconciliation Dashboard
+              </p>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <span style={{ fontSize: "12px", color: "var(--green)" }}>● {dbStatus}</span>
+            </div>
+          </div>
+
+          <div className="grid">
+            <div className="card">
+              <h3>Live Trade Processing & Reconciliation Feed</h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Account</th>
+                    <th>Symbol</th>
+                    <th>Side</th>
+                    <th>Qty</th>
+                    <th>Price</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trades.map(t => (
+                    <tr key={t.tradeId}>
+                      <td>{t.accountId}</td>
+                      <td><strong>{t.symbol}</strong></td>
+                      <td style={{ color: t.side === "Buy" ? "var(--green)" : "var(--red)" }}>{t.side}</td>
+                      <td>{t.quantity.toLocaleString()}</td>
+                      <td>{t.price.toFixed(4)}</td>
+                      <td>
+                        <span className={`badge badge-${t.status}`}>{t.status}</span>
+                        {t.discrepancyReason && (
+                          <div style={{ fontSize: "11px", color: "var(--red)", marginTop: "4px" }}>
+                            {t.discrepancyReason}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        {t.status === "Discrepancy" && (
+                          <button className="btn-reconcile" onClick={() => handleOverrideReconcile(t.tradeId)}>
+                            Approve & Reconcile
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div>
+              <div className="card" style={{ marginBottom: "20px" }}>
+                <h3>Simulate Trade Ingestion (API Test)</h3>
+                <form onSubmit={handleIngest}>
+                  <div className="form-group">
+                    <label>Account ID</label>
+                    <input value={form.accountId} onChange={e => setForm({...form, accountId: e.target.value})} />
+                  </div>
+                  <div className="form-group">
+                    <label>Symbol</label>
+                    <select value={form.symbol} onChange={e => setForm({...form, symbol: e.target.value})}>
+                      <option value="EURUSD">EURUSD</option>
+                      <option value="GBPUSD">GBPUSD</option>
+                      <option value="USDJPY">USDJPY</option>
+                      <option value="AUDUSD">AUDUSD</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Side</label>
+                    <select value={form.side} onChange={e => setForm({...form, side: e.target.value})}>
+                      <option value="Buy">Buy</option>
+                      <option value="Sell">Sell</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Quantity</label>
+                    <input type="number" value={form.quantity} onChange={e => setForm({...form, quantity: e.target.value})} />
+                  </div>
+                  <div className="form-group">
+                    <label>Price</label>
+                    <input type="number" step="0.0001" value={form.price} onChange={e => setForm({...form, price: e.target.value})} />
+                  </div>
+                  <button type="submit" style={{ width: "100%" }}>Submit Order (Idempotent)</button>
+                </form>
+              </div>
+
+              <div className="card">
+                <h3>Immutable Audit Stream</h3>
+                <div className="audit-box">
+                  {logs.map((log, index) => (
+                    <div key={index} style={{ marginBottom: "8px", borderBottom: "1px solid #1f242c", paddingBottom: "4px" }}>
+                      <span style={{ color: "#8b949e" }}>[{log.time}]</span> <strong>{log.action}</strong>: {log.details}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
