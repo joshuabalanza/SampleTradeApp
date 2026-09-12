@@ -1,6 +1,5 @@
-# Blueberry TradeOps Showcase Project
-**Candidate:** Joshua Kim C. Balanza  
-**Target Role:** Senior Software Engineer (Operate Squad) — Blueberry Markets  
+# TradeOps Sample Project
+**By:** Joshua Kim C. Balanza  
 **Stack:** .NET 9 (C#), PostgreSQL, React, System.Threading.Channels, xUnit
 
 ---
@@ -49,11 +48,3 @@ Open `index.html` directly in your browser:
 ```bash
 open index.html
 ```
-
----
-
-## 3. Interview Talking Points (Connecting Code to Your Experience)
-- **On Idempotency:** *"At Yondu and in digital banking systems, network retries can easily cause duplicate bookings. In this showcase, I enforced atomic idempotency checks so identical keys safely return the original trade."*
-- **On High-Throughput & .NET Internals:** *"I used `System.Threading.Channels` with `ValueTask` on the write path to avoid heap allocations on hot ingestion paths, decoupling order intake from downstream execution via backpressured async background workers."*
-- **On PostgreSQL vs MSSQL:** *"Coming from heavy MSSQL stored procedures and indexing, in PostgreSQL I leverage MVCC, avoid table bloat on high-update tables by tuning autovacuum, and use advisory locks (`pg_try_advisory_xact_lock`) for distributed reconciliation workers."*
-- **On Supporting Operations & Finance:** *"Software in the Operate squad must be operationally ergonomic. I designed an immutable audit stream and built a React back-office dashboard so Ops has complete visibility and self-serve reconciliation actions."*
