@@ -48,7 +48,7 @@ This project provides an end-to-end solution:
 6. **Authentication & User Directory (`TradeOps.Core/Services/IUserService` & `AuthController`):**
    - Secure PBKDF2 (SHA-256 with 100,000 iterations & random 16-byte salt) password hashing via standard .NET cryptography.
    - Real database registration (`POST /api/auth/register`) and login (`POST /api/auth/login`) persisted in PostgreSQL or in-memory fallback.
-7. **TradeOps Terminal (`webapp/`):**
+7. **TradeOps Terminal (`TradeOpsWebApp/`):**
    - Full React (Vite) single-page app simulating a trading desk: sign in / register account tabs, live dashboard, trade blotter with filters, an order ticket, and a trade detail view with audit trail + manual broker reconciliation.
 
 ---
@@ -58,7 +58,7 @@ This project provides an end-to-end solution:
 ```mermaid
 flowchart LR
     subgraph Client
-        UI["TradeOps Terminal<br/>(React + Vite, webapp/)"]
+        UI["TradeOps Terminal<br/>(React + Vite, TradeOpsWebApp/)"]
         Legacy["Legacy single-file demo<br/>(index.html)"]
     end
 
@@ -108,7 +108,7 @@ capstone/
 ├── sql/
 │   ├── schema.sql            # Postgres schema (trades, trade_audit_logs, users, enums, indexes, audit trigger)
 │   └── run_demo.py           # Standalone SQLite simulation of the schema/trigger logic
-├── webapp/                  # React (Vite) TradeOps Terminal — full trading UI
+├── TradeOpsWebApp/           # React (Vite) TradeOps Terminal — full trading UI
 │   └── src/
 │       ├── api/               # tradesApi.js, authApi.js — fetch clients for TradeOps.Api
 │       ├── auth/               # AuthContext.jsx (session state, auth API integration with offline fallback)
@@ -123,12 +123,12 @@ capstone/
 
 ## 4. Prerequisites
 
-| Tool           | Version    | Notes                                                             |
-| -------------- | ---------- | ----------------------------------------------------------------- |
-| .NET SDK       | 9.0+       | `dotnet --version`                                                |
-| Docker Desktop | any recent | for the PostgreSQL container                                      |
-| Node.js        | 18+        | for the `webapp/` front-end (via `nvm`, `fnm`, or system install) |
-| npm            | 9+         | ships with Node                                                   |
+| Tool           | Version    | Notes                                                                 |
+| -------------- | ---------- | --------------------------------------------------------------------- |
+| .NET SDK       | 9.0+       | `dotnet --version`                                                    |
+| Docker Desktop | any recent | for the PostgreSQL container                                          |
+| Node.js        | 18+        | for `TradeOpsWebApp/` front-end (via `nvm`, `fnm`, or system install) |
+| npm            | 9+         | ships with Node                                                       |
 
 ---
 
@@ -165,17 +165,17 @@ By default the API listens on `http://localhost:5025` (see `TradeOps.Api/Propert
 
 ### Running the TradeOps Terminal (React front-end)
 
-The full trading UI lives in `webapp/` (Vite + React + React Router).
+The full trading UI lives in `TradeOpsWebApp/` (Vite + React + React Router).
 
 ```bash
-cd webapp
+cd TradeOpsWebApp
 npm install
 npm run dev
 ```
 
 Open the printed local URL (typically `http://localhost:5173`). Sign in with one of the demo accounts shown on the login screen (e.g. `trader1` / `demo123`).
 
-The app calls the API at the URL configured in `webapp/.env` (`VITE_API_BASE_URL`, defaults to `http://localhost:5025/api`) — copy `webapp/.env.example` if you need to override it. CORS is already open (`AllowAnyOrigin`) on the API for local development.
+The app calls the API at the URL configured in `TradeOpsWebApp/.env` (`VITE_API_BASE_URL`, defaults to `http://localhost:5025/api`) — copy `TradeOpsWebApp/.env.example` if you need to override it. CORS is already open (`AllowAnyOrigin`) on the API for local development.
 
 **Flow covered end-to-end:** Login → Dashboard (live stats & market ticker) → New Order ticket (idempotent submission) → automatic background execution → Trade Detail (audit trail) → manual broker reconciliation.
 
@@ -224,10 +224,10 @@ The legacy single-file prototype (`index.html`, CDN React + Babel) is still avai
 
 ## 8. Configuration & Environment Variables
 
-| Location                                 | Key                          | Purpose                                                                                   |
-| ---------------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------- |
-| `TradeOps.Api/appsettings.json`          | `ConnectionStrings:Postgres` | Postgres connection string. If empty/missing, the API uses `InMemoryTradeRepository`.     |
-| `webapp/.env` (copy from `.env.example`) | `VITE_API_BASE_URL`          | Base URL the React app uses to call `TradeOps.Api` (default `http://localhost:5025/api`). |
+| Location                                         | Key                          | Purpose                                                                                   |
+| ------------------------------------------------ | ---------------------------- | ----------------------------------------------------------------------------------------- |
+| `TradeOps.Api/appsettings.json`                  | `ConnectionStrings:Postgres` | Postgres connection string. If empty/missing, the API uses `InMemoryTradeRepository`.     |
+| `TradeOpsWebApp/.env` (copy from `.env.example`) | `VITE_API_BASE_URL`          | Base URL the React app uses to call `TradeOps.Api` (default `http://localhost:5025/api`). |
 
 ---
 
